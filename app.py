@@ -2,8 +2,9 @@ import streamlit as st
 import os
 import time
 from dotenv import load_dotenv
+from PIL import Image
 
-# Tải các biến môi trường (dù không dùng API ở bước này, giữ lại là thói quen tốt)
+# Tải các biến môi trường
 load_dotenv()
 
 # --- Cấu hình trang ---
@@ -14,54 +15,93 @@ st.set_page_config(
 )
 
 # --- Model AI Giả lập (Mock AI Model) ---
-def get_mock_ai_response(user_message):
+def get_mock_ai_response(user_message, image_bytes=None):
     """
-    Hàm này giả lập việc gọi đến một model AI.
-    Nó sẽ trả về một câu trả lời được lập trình sẵn dựa trên tin nhắn người dùng.
+    Hàm giả lập AI, giờ đây có thể "nhìn" được ảnh.
     """
-    # Chuyển tin nhắn về chữ thường để dễ so sánh
     user_message = user_message.lower()
     
+    # Nếu có ảnh được gửi kèm
+    if image_bytes:
+        # Giả lập AI phân tích ảnh
+        if "what is in this photo" in user_message or "có gì trong ảnh" in user_message:
+            return "Đây là một câu trả lời giả lập: Bức ảnh bạn gửi có vẻ như chứa..."
+        elif "màu gì" in user_message:
+             return "Đây là một câu trả lời giả lập: Màu sắc chủ đạo trong ảnh là..."
+        else:
+            return f"Đây là một câu trả lời giả lập: Tôi đã nhận được ảnh và câu hỏi của bạn: '{user_message}'."
+    
+    # Logic cũ nếu không có ảnh
     if "xin chào" in user_message:
         return "Xin chào! Tôi có thể giúp gì cho bạn hôm nay?"
     elif "bạn tên là gì" in user_message:
         return "Tôi là một trợ lý AI được tạo ra để demo."
-    elif "khỏe không" in user_message:
-        return "Tôi khỏe, cảm ơn bạn đã hỏi! Còn bạn thì sao?"
     else:
         return f"Tôi đã nhận được tin nhắn của bạn: '{user_message}'. Đây là một câu trả lời mẫu."
 
 # --- Quản lý Trạng thái Phiên (Session State) ---
-# Khởi tạo lịch sử chat nếu nó chưa tồn tại
 if "messages" not in st.session_state:
     st.session_state.messages = []
+# Thêm state để lưu trữ file được tải lên
+if "uploaded_image" not in st.session_state:
+    st.session_state.uploaded_image = None
+
 
 # --- Giao diện người dùng (UI) ---
 st.title("🤖 Chat App Đa Năng")
 st.write("Trò chuyện, phân tích ảnh và dữ liệu CSV.")
 st.markdown("---")
 
+
+# --- PHẦN UI MỚI: KHU VỰC TẢI FILE ---
+with st.sidebar:
+    st.header("Tải tệp lên")
+    # Widget tải ảnh
+    uploaded_file = st.file_uploader(
+        "Tải lên một hình ảnh", type=["png", "jpg", "jpeg"], label_visibility="collapsed"
+    )
+    if uploaded_file:
+        # Đọc dữ liệu ảnh và lưu vào session state
+        image_bytes = uploaded_file.getvalue()
+        st.session_state.uploaded_image = image_bytes
+        # Hiển thị ảnh preview
+        st.image(image_bytes, caption="Ảnh đã tải lên")
+
+
 # Hiển thị các tin nhắn đã có trong lịch sử
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        # Xử lý hiển thị nội dung, có thể bao gồm cả ảnh
+        if "image" in message:
+            st.image(message["image"], width=200)
+        if "content" in message:
+            st.markdown(message["content"])
 
 # Ô nhập liệu và nút gửi
 if prompt := st.chat_input("Nhập câu hỏi của bạn..."):
-    # 1. Thêm tin nhắn của người dùng vào lịch sử và hiển thị
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Tạo một tin nhắn mới của người dùng để thêm vào lịch sử
+    user_message = {"role": "user", "content": prompt}
 
-    # 2. Tạo phản hồi từ AI và hiển thị
-    with st.chat_message("assistant"):
-        # Hiển thị chỉ báo đang tải (loading spinner)
-        with st.spinner("AI đang suy nghĩ... 🤔"):
-            # Gọi model AI giả lập
-            response = get_mock_ai_response(prompt)
-            # Giả lập thời gian xử lý
-            time.sleep(1) 
-            st.markdown(response)
+    # Nếu có ảnh đang chờ xử lý, đính kèm nó vào tin nhắn
+    if st.session_state.uploaded_image:
+        user_message["image"] = st.session_state.uploaded_image
     
-    # 3. Thêm phản hồi của AI vào lịch sử
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    # Thêm tin nhắn vào lịch sử và hiển thị
+    st.session_state.messages.append(user_message)
+    with st.chat_message("user"):
+        if "image" in user_message:
+            st.image(user_message["image"], width=200)
+        st.markdown(user_message["content"])
+
+    # Tạo phản hồi từ AI
+    with st.chat_message("assistant"):
+        with st.spinner("AI đang suy nghĩ... 🤔"):
+            response_content = get_mock_ai_response(prompt, st.session_state.uploaded_image)
+            time.sleep(1)
+            st.markdown(response_content)
+    
+    # Thêm phản hồi của AI vào lịch sử
+    st.session_state.messages.append({"role": "assistant", "content": response_content})
+
+    # Quan trọng: Xóa ảnh đã xử lý khỏi state để nó không bị gửi ở các lượt sau
+    st.session_state.uploaded_image = None
