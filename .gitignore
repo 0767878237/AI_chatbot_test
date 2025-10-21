@@ -1,0 +1,7 @@
+# Môi trường ảo
+venv/
+*.pyc
+__pycache__/
+
+# File môi trường
+.env
