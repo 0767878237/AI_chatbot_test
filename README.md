@@ -1,6 +1,5 @@
 # Yêu cầu cần có
-Python 3.8 trở lên.
-pip.
+Python 3.8 trở lên, pip
 
 # git
 git clone https://github.com/0767878237/AI_chatbot_test.git
